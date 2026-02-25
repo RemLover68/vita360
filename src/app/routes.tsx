@@ -41,8 +41,8 @@ export const router = createBrowserRouter([
     path: "/operador",
     element: <RequireAuth><LayoutOperador /></RequireAuth>,
     children: [
-      { index: true, Component: OperadorPage },
-      { path: "dashboard", Component: Dashboard },
+      { index: true, Component: Dashboard },
+      { path: "tickets", Component: OperadorPage },
     ],
   },
   {

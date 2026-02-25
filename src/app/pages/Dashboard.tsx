@@ -1,19 +1,13 @@
-import { 
-  AlertTriangle, 
-  Clock, 
-  Check, 
-  Filter, 
+import {
+  AlertTriangle,
+  Clock,
   ChevronDown,
   MapPin,
   FileQuestion,
   Zap,
-  Map as MapIcon,
-  X as CloseIcon,
-  ChevronRight
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth, API_URL } from '../../context/AuthContext';
-import { Link } from 'react-router';
 
 // Tipos de iconos por tipo de caso
 const caseTypeIcons: Record<string, any> = {
@@ -33,13 +27,15 @@ interface Ticket {
   area_name: string;
   assigned_to: string | null;
   created_at: string;
+  // Campos sintéticos solo para el dashboard
+  _urgency_score?: number;
+  _priority_label?: string;
 }
 
 interface DashboardStats {
   total_tickets: number;
   tickets_by_status: Record<string, number>;
   avg_response_time: string;
-  resolution_rate: number;
   tickets_at_risk: number;
 }
 
@@ -123,6 +119,16 @@ function mapUrgencyToColor(urgency: string): string {
 function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+  const [currentTime, setCurrentTime] = useState<string>(
+    new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (mapInstance.current || !mapRef.current) return;
@@ -200,23 +206,39 @@ function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
   }, [tickets]);
 
   return (
-    <div 
-      ref={mapRef} 
-      className="w-full h-[400px] rounded-lg bg-[#F3F5F7] border border-[#E6EAF0]"
-    />
+    <div className="bg-white border border-[#E6EAF0] rounded-lg shadow-[0_2px_8px_rgba(16,24,40,0.06)] p-4 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#306CBB]/10 text-[#306CBB]">
+            <MapPin size={16} />
+          </span>
+          <div>
+            <div className="text-[14px] font-semibold text-[#2F3A46]">Mapa Urbano — Casos en Tiempo Real</div>
+            <div className="text-[11px] text-[#6D7783]">Distribución aproximada de tickets ciudadanos</div>
+          </div>
+        </div>
+        <div className="text-[11px] text-[#6D7783] px-2 py-1 rounded-full bg-[#F3F5F7] border border-[#E6EAF0]">
+          ⏱ {currentTime} hrs
+        </div>
+      </div>
+      <div
+        ref={mapRef}
+        className="w-full h-[400px] rounded-lg bg-[#F3F5F7] border border-[#E6EAF0]"
+      />
+    </div>
   );
 }
 
 export default function Dashboard() {
   const { token } = useAuth();
   const [sortBy, setSortBy] = useState<'urgency' | 'date'>('urgency');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
+  const [areaFilterOpen, setAreaFilterOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showMap, setShowMap] = useState(false);
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<any>(null);
 
   useEffect(() => {
     if (token) fetchData();
@@ -231,18 +253,50 @@ export default function Dashboard() {
       });
       if (ticketsRes.ok) {
         const ticketsData = await ticketsRes.json();
-        setTickets(ticketsData);
+        const enriched: Ticket[] = ticketsData.map((t: Ticket) => {
+          // Área placeholder si no viene definida
+          const areasFallback = ['Atención General', 'Áreas Verdes', 'Aseo', 'Infraestructura'];
+          const area_name = t.area_name || areasFallback[Math.floor(Math.random() * areasFallback.length)];
+
+          // Asignar un score sintético de urgencia según el nivel
+          let min = 20;
+          let max = 80;
+          if (t.urgency_level === 'Alta') {
+            min = 70;
+            max = 100;
+          } else if (t.urgency_level === 'Media') {
+            min = 40;
+            max = 75;
+          } else if (t.urgency_level === 'Baja') {
+            min = 10;
+            max = 45;
+          }
+          const score = Math.floor(Math.random() * (max - min + 1)) + min;
+
+          let priorityLabel = 'Normal';
+          if (score >= 85) priorityLabel = 'Crítica';
+          else if (score >= 65) priorityLabel = 'Alta';
+          else if (score >= 45) priorityLabel = 'Media';
+
+          return {
+            ...t,
+            area_name,
+            _urgency_score: score,
+            _priority_label: priorityLabel,
+          };
+        });
+
+        setTickets(enriched);
         
         // Calcular stats
         const stats: DashboardStats = {
-          total_tickets: ticketsData.length,
-          tickets_by_status: ticketsData.reduce((acc: Record<string, number>, t: Ticket) => {
+          total_tickets: enriched.length,
+          tickets_by_status: enriched.reduce((acc: Record<string, number>, t: Ticket) => {
             acc[t.status] = (acc[t.status] || 0) + 1;
             return acc;
           }, {}),
           avg_response_time: '2h 15m',
-          resolution_rate: ticketsData.filter((t: Ticket) => t.status === 'Resuelto').length / ticketsData.length * 100 || 0,
-          tickets_at_risk: ticketsData.filter((t: Ticket) => t.status !== 'Resuelto' && t.urgency_level === 'Alta').length,
+          tickets_at_risk: enriched.filter((t: Ticket) => t.status !== 'Resuelto' && t.urgency_level === 'Alta').length,
         };
         setStats(stats);
       }
@@ -255,14 +309,16 @@ export default function Dashboard() {
 
   const filteredCases = useMemo(() => {
     let filtered = tickets.filter(c => {
-      if (filterStatus && c.status !== filterStatus) return false;
+      if (selectedStatuses.length && !selectedStatuses.includes(c.status)) return false;
+      if (selectedAreas.length && !selectedAreas.includes(c.area_name)) return false;
       return true;
     });
 
     return filtered.sort((a, b) => {
       if (sortBy === 'urgency') {
-        const urgencyOrder: Record<string, number> = { 'Alta': 0, 'Media': 1, 'Baja': 2 };
-        return (urgencyOrder[a.urgency_level] || 3) - (urgencyOrder[b.urgency_level] || 3);
+        const aScore = a._urgency_score ?? 0;
+        const bScore = b._urgency_score ?? 0;
+        return bScore - aScore;
       }
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     }).slice(0, 5); // Mostrar solo los 5 primeros
@@ -277,70 +333,105 @@ export default function Dashboard() {
       {/* KPI Cards - Datos Reales */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <KPICard title="Total de Tickets" value={stats?.total_tickets || 0} color="gray" progress={100} />
-        <KPICard 
-          title="% Resueltos" 
-          value={`${Math.round(stats?.resolution_rate || 0)}%`} 
-          color="green" 
-          progress={stats?.resolution_rate || 0} 
-        />
+        <div className="bg-white border border-[#E6EAF0] rounded-lg p-5 shadow-[0_2px_8px_rgba(16,24,40,0.06)] flex-1 min-w-[220px]">
+          <div className="text-[12px] text-[#6D7783] mb-2">Distribución por estado (%)</div>
+          <div className="space-y-1.5 text-[11.5px] text-[#4B5563]">
+            {stats && Object.entries(stats.tickets_by_status).map(([status, count]) => {
+              const pct = stats.total_tickets ? Math.round((count / stats.total_tickets) * 100) : 0;
+              return (
+                <div key={status} className="flex items-center gap-2">
+                  <span className="w-20">{status}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
+                    <div className="h-full rounded-full bg-[#306CBB]" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="w-8 text-right text-[11px] text-[#6D7783]">{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
         <KPICard title="Tiempo Promedio Respuesta" value={stats?.avg_response_time || '-'} color="gray" progress={60} />
         <KPICard title="Tickets en Riesgo" value={stats?.tickets_at_risk || 0} color="red" progress={35} />
       </div>
 
-      {/* Botón Mapa */}
-      <div className="mb-6">
-        <button
-          onClick={() => setShowMap(!showMap)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#306CBB] text-white rounded-lg text-[14px] font-medium hover:bg-[#2555a0] transition-colors"
-        >
-          <MapIcon size={16} />
-          {showMap ? 'Ocultar Mapa' : 'Ver Mapa Urbano'}
-          <ChevronDown size={16} className={`transition-transform ${showMap ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
-
-      {/* Panel Mapa - Integrado */}
-      {showMap && (
-        <div className="bg-white border border-[#E6EAF0] rounded-lg shadow-[0_2px_8px_rgba(16,24,40,0.06)] p-4 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[16px] font-semibold text-[#2F3A46]">Mapa Urbano — Casos en Tiempo Real</h2>
-            <button 
-              onClick={() => setShowMap(false)}
-              className="p-1 hover:bg-[#f0f0f0] rounded"
-            >
-              <CloseIcon size={18} />
-            </button>
-          </div>
-          <MapComponentInline tickets={tickets} />
-        </div>
-      )}
+      {/* Mapa Urbano siempre visible */}
+      <MapComponentInline tickets={tickets} />
 
       {/* Main Content - Two Columns */}
       <div className="flex gap-6 flex-col lg:flex-row">
         {/* Left Column - Table */}
         <div className="flex-1">
           {/* Controls Strip */}
-          <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 mb-4 flex items-center gap-4 flex-wrap">
-            <select 
-              value={filterStatus} 
-              onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-[#E6EAF0] rounded-lg text-[14px] bg-white cursor-pointer outline-none hover:border-[#306CBB]"
-            >
-              <option value="">Todos los estados</option>
-              <option value="Recibido">Recibido</option>
-              <option value="Asignado">Asignado</option>
-              <option value="En Gestión">En Gestión</option>
-              <option value="Resuelto">Resuelto</option>
-            </select>
+          <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 mb-4 flex items-center gap-4 flex-wrap relative">
+            {/* Filtro múltiple por estado */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setStatusFilterOpen(o => !o)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#E6EAF0] rounded-lg text-[13px] bg-white hover:border-[#306CBB]"
+              >
+                Estado
+                <ChevronDown size={14} className={`transition-transform ${statusFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {statusFilterOpen && (
+                <div className="absolute mt-1 w-44 bg-white border border-[#E5E7EB] rounded-md shadow-lg z-20 p-2 space-y-1 text-[12.5px]">
+                  {['Recibido', 'Asignado', 'En Gestión', 'Resuelto', 'Cerrado'].map(status => (
+                    <label key={status} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedStatuses.includes(status)}
+                        onChange={() => {
+                          setSelectedStatuses(prev =>
+                            prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+                          );
+                        }}
+                      />
+                      <span>{status}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Filtro múltiple por área */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAreaFilterOpen(o => !o)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#E6EAF0] rounded-lg text-[13px] bg-white hover:border-[#306CBB]"
+              >
+                Área
+                <ChevronDown size={14} className={`transition-transform ${areaFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {areaFilterOpen && (
+                <div className="absolute mt-1 w-48 bg-white border border-[#E5E7EB] rounded-md shadow-lg z-20 p-2 space-y-1 text-[12.5px] max-h-60 overflow-y-auto">
+                  {Array.from(new Set(tickets.map(t => t.area_name))).map(area => (
+                    <label key={area} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedAreas.includes(area)}
+                        onChange={() => {
+                          setSelectedAreas(prev =>
+                            prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+                          );
+                        }}
+                      />
+                      <span>{area}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="w-px h-6 bg-[#E6EAF0]" />
             <div className="flex items-center gap-2 text-[14px]">
               <span className="text-[#6D7783]">Ordenar por:</span>
-              <select 
-                value={sortBy} 
+              <select
+                value={sortBy}
                 onChange={e => setSortBy(e.target.value as any)}
                 className="px-3 py-2 border border-[#E6EAF0] rounded-lg text-[14px] bg-white cursor-pointer outline-none hover:border-[#306CBB]"
               >
-                <option value="urgency">Urgencia</option>
+                <option value="urgency">Prioridad</option>
                 <option value="date">Más recientes</option>
               </select>
             </div>
@@ -354,6 +445,7 @@ export default function Dashboard() {
                   <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">ID</th>
                   <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Título</th>
                   <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Urgencia</th>
+                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Prioridad</th>
                   <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Área</th>
                   <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Estado</th>
                 </tr>
@@ -382,6 +474,14 @@ export default function Dashboard() {
                           <span className={`inline-block px-3 py-1 rounded-full text-[13px] font-medium text-white ${urgencyColor}`}>
                             {caso.urgency_level || 'Sin definir'}
                           </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col text-[12px] text-[#111827]">
+                            <span className="font-medium">{caso._priority_label || 'Normal'}</span>
+                            {typeof caso._urgency_score === 'number' && (
+                              <span className="text-[11px] text-[#6B7280]">{caso._urgency_score}%</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4">
                           <span className="text-[14px] text-[#2F3A46]">{caso.area_name || '-'}</span>

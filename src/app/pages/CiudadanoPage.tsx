@@ -295,12 +295,19 @@ export default function CiudadanoPage() {
           </button>
           <div className="bg-white rounded-xl border border-border shadow-sm p-5 space-y-5">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1">
                   <span className="text-[11.5px] text-muted-foreground font-mono">#{selectedTicket.id}</span>
                   <StatusBadge status={selectedTicket.status} />
+                  {selectedTicket.urgency_level && <UrgencyBadge level={selectedTicket.urgency_level} />}
+                  {selectedTicket.area_name && (
+                    <span className="px-2 py-0.5 rounded-md text-[11px] bg-secondary text-muted-foreground border border-border">
+                      {selectedTicket.area_name}
+                    </span>
+                  )}
                 </div>
-                <h2 className="text-[14px] font-semibold">{selectedTicket.title}</h2>
-                <p className="text-[12.5px] text-muted-foreground mt-1.5">{selectedTicket.description}</p>
+                <h2 className="text-[13.5px] font-medium text-foreground mt-1.5">
+                  {selectedTicket.description || selectedTicket.title}
+                </h2>
               </div>
 
               {/* Timeline del estado */}
@@ -418,7 +425,7 @@ export default function CiudadanoPage() {
               <h3 className="text-[13.5px] font-medium text-foreground mb-1">{ticket.title}</h3>
               <p className="text-[12px] text-muted-foreground line-clamp-2">{ticket.description}</p>
               <div className="mt-2.5 flex items-center gap-3 text-[11.5px] text-muted-foreground">
-                {ticket.area_name && <span>📂 {ticket.area_name}</span>}
+                {ticket.area_name && <span>{ticket.area_name}</span>}
                 {ticket.assigned_to && <span>👷 {ticket.assigned_to}</span>}
                 {ticket.evidences?.length > 0 && <span>📎 {ticket.evidences.length} foto(s)</span>}
               </div>

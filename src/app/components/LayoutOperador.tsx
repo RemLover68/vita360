@@ -6,8 +6,7 @@ import {
 import { useState } from 'react';
 
 const menuItems = [
-  { path: '/operador', label: 'Gestión Tickets', icon: LayoutDashboard, exact: true },
-  { path: '/operador/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/operador', label: 'Dashboard', icon: LayoutDashboard, exact: true },
 ];
 
 export function LayoutOperador() {
@@ -68,8 +67,14 @@ export function LayoutOperador() {
 
       {/* Header */}
       <header className="fixed top-0 left-[220px] right-0 h-[60px] bg-white border-b border-border flex items-center px-6 z-40">
-        <div className="text-[13px] text-muted-foreground">
-          Panel de Operador — <span className="text-foreground font-medium">Vita360</span>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+            <LayoutDashboard className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <div className="text-[15px] font-semibold text-foreground leading-tight">Vita360</div>
+            <div className="text-[11px] text-muted-foreground">Operador</div>
+          </div>
         </div>
       </header>
 
