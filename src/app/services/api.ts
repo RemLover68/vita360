@@ -39,17 +39,10 @@ export interface DashboardStats {
   at_risk_count: number;
 }
 
-// Helper para obtener token
+// 🔥 CORREGIDO: Helper para obtener token desde localStorage
 const getToken = (): string | null => {
-  const authData = localStorage.getItem('auth');
-  if (authData) {
-    try {
-      return JSON.parse(authData).token;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  // IMPORTANTE: Debe coincidir con AuthContext.tsx que usa 'vita360_token'
+  return localStorage.getItem('vita360_token');
 };
 
 // Headers con autenticación
@@ -72,10 +65,17 @@ const getHeaders = (includeAuth = true): HeadersInit => {
 
 export const apiAuth = {
   login: async (email: string, password: string) => {
+    // 🔥 CORREGIDO: El backend espera application/x-www-form-urlencoded
+    const form = new URLSearchParams();
+    form.append('username', email);
+    form.append('password', password);
+
     const response = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
-      headers: getHeaders(false),
-      body: JSON.stringify({ username: email, password }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form,
     });
 
     if (!response.ok) {
