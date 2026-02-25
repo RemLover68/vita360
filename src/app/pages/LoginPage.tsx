@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, API_URL } from '../../context/AuthContext';
 import { LayoutDashboard } from 'lucide-react';
 
 export default function LoginPage() {
@@ -13,22 +13,40 @@ export default function LoginPage() {
   const [role, setRole] = useState<'ciudadano' | 'operador'>('ciudadano');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = async () => {
     setError('');
+    setSuccess('');
+
+    // Validaciones locales
+    if (mode === 'register' && !name.trim()) {
+      setError('El nombre es obligatorio');
+      return;
+    }
+    if (!email.trim()) {
+      setError('El email es obligatorio');
+      return;
+    }
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login(email, password);
+        await login(email.trim(), password);
         navigate('/');
       } else {
-        await register(name, email, password, role);
+        await register(name.trim(), email.trim(), password, role);
+        setSuccess('✅ Cuenta creada correctamente. Ahora podés iniciar sesión.');
         setMode('login');
-        setError('');
-        alert('Cuenta creada. Ahora inicia sesión.');
+        setName('');
+        setPassword('');
       }
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || 'Error desconocido');
     } finally {
       setLoading(false);
     }
@@ -54,7 +72,7 @@ export default function LoginPage() {
             {(['login', 'register'] as const).map(m => (
               <button
                 key={m}
-                onClick={() => { setMode(m); setError(''); }}
+                onClick={() => { setMode(m); setError(''); setSuccess(''); }}
                 className={`flex-1 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
                   mode === m ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                 }`}
@@ -95,7 +113,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="mínimo 6 caracteres"
                 className="w-full px-3 py-2.5 border border-border rounded-lg text-[13px] outline-none focus:border-primary bg-background"
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               />
@@ -108,6 +126,7 @@ export default function LoginPage() {
                   {(['ciudadano', 'operador'] as const).map(r => (
                     <button
                       key={r}
+                      type="button"
                       onClick={() => setRole(r)}
                       className={`flex-1 py-2 rounded-lg text-[13px] border transition-colors ${
                         role === r
@@ -127,19 +146,31 @@ export default function LoginPage() {
               </div>
             )}
 
+            {/* Mensajes de error y éxito */}
             {error && (
               <div className="px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-[12.5px] text-red-700">
-                {error}
+                ⚠️ {error}
+              </div>
+            )}
+            {success && (
+              <div className="px-3 py-2.5 bg-green-50 border border-green-200 rounded-lg text-[12.5px] text-green-700">
+                {success}
               </div>
             )}
 
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={loading}
               className="w-full py-2.5 bg-primary text-white rounded-lg text-[13px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
             >
               {loading ? 'Cargando...' : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
             </button>
+
+            {/* Info del backend conectado */}
+            <p className="text-[10.5px] text-muted-foreground text-center">
+              Backend: <span className="font-mono">{API_URL}</span>
+            </p>
           </div>
         </div>
       </div>

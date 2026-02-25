@@ -28,6 +28,18 @@ export function useAuth() {
 
 export { API_URL };
 
+// Helper: convierte cualquier formato de error de FastAPI a string legible
+function parseError(err: any, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err.detail === 'string') return err.detail;
+  if (Array.isArray(err.detail)) {
+    // Errores de validación de Pydantic: [{loc, msg, type}]
+    return err.detail.map((d: any) => d.msg || JSON.stringify(d)).join(' · ');
+  }
+  if (err.message) return err.message;
+  return fallback;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -37,8 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem('vita360_token');
     const savedUser = localStorage.getItem('vita360_user');
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('vita360_token');
+        localStorage.removeItem('vita360_user');
+      }
     }
     setIsLoading(false);
   }, []);
@@ -55,8 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Login failed');
+      const err = await res.json().catch(() => ({}));
+      throw new Error(parseError(err, 'Error al iniciar sesión'));
     }
 
     const data = await res.json();
@@ -75,8 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Registration failed');
+      const err = await res.json().catch(() => ({}));
+      throw new Error(parseError(err, 'Error al registrar usuario'));
     }
   };
 
