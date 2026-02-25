@@ -2,7 +2,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Outlet, Navigate } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, LogOut } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 
 interface LayoutProps {
   citizen?: boolean;
@@ -13,30 +13,22 @@ export function Layout({ citizen }: LayoutProps) {
 
   if (citizen) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[#F5F7FA]">
         {/* Header ciudadano */}
-        <header className="fixed top-0 left-0 right-0 h-[60px] bg-white border-b border-border flex items-center px-6 z-50">
+        <header className="fixed top-0 left-0 right-0 h-[72px] bg-white border-b border-[#E6EAF0] flex items-center px-6 z-50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
-              <LayoutDashboard className="w-4 h-4 text-white" />
+            <div className="w-10 h-10 bg-[#306CBB] rounded-lg flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-foreground leading-tight">Vita360</div>
-              <div className="text-[11px] text-muted-foreground">Portal Ciudadano</div>
+              <div className="text-[20px] font-semibold">
+                <span className="text-[#2F3A46]">Atención</span>
+                <span className="text-[#306CBB]"> 360</span>
+              </div>
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-[13px] text-muted-foreground">
-              👤 <span className="font-medium text-foreground">{user?.name}</span>
-            </span>
-            <button onClick={logout}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-[13px] text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
-              <LogOut className="w-3.5 h-3.5" />
-              Salir
-            </button>
-          </div>
         </header>
-        <main className="mt-[60px] p-6 max-w-7xl mx-auto">
+        <main className="mt-[72px] p-6 max-w-7xl mx-auto">
           <Outlet />
         </main>
       </div>
@@ -44,11 +36,13 @@ export function Layout({ citizen }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#F5F7FA]">
       <Sidebar />
       <Header />
-      <main className="ml-[220px] mt-[60px] p-6">
-        <Outlet />
+      <main className="ml-[240px] mt-[72px] p-6">
+        <div className="max-w-[1400px] mx-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
