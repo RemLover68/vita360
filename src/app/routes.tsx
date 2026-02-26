@@ -26,10 +26,6 @@ function RoleRouter() {
 
 export const router = createBrowserRouter([
   {
-    path: "/login",
-    Component: LoginPage,
-  },
-  {
     path: "/ciudadano",
     element: <RequireAuth><Layout citizen /></RequireAuth>,
     children: [
@@ -46,7 +42,15 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/",
+    path: "/login",
+    Component: LoginPage,
+  },
+  {
+    path: "/app",
     Component: RoleRouter,
+  },
+  {
+    path: "/",
+    Component: LoginPage,
   },
 ]);

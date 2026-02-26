@@ -37,7 +37,7 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         await login(email.trim(), password);
-        navigate('/');
+        navigate('/app');
       } else {
         await register(name.trim(), email.trim(), password, role);
         setSuccess('✅ Cuenta creada correctamente. Ahora podés iniciar sesión.');
