@@ -220,9 +220,8 @@ function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#306CBB]/10 text-[#306CBB]">
             <MapPin size={16} />
           </span>
-          <div>
-            <div className="text-[14px] font-semibold text-[#2F3A46]">Mapa Urbano — Casos en Tiempo Real</div>
-            <div className="text-[11px] text-[#6D7783]">Distribución aproximada de tickets ciudadanos</div>
+          <div className="text-[15px] font-semibold text-[#2F3A46]">
+            VITwin
           </div>
         </div>
         <div className="text-[11px] text-[#6D7783] px-2 py-1 rounded-full bg-[#F3F5F7] border border-[#E6EAF0]">
