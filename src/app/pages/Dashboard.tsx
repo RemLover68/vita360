@@ -30,6 +30,8 @@ interface Ticket {
   // Campos sintéticos solo para el dashboard
   _urgency_score?: number;
   _priority_label?: string;
+  // Solo para detalle rápido en dashboard (texto completo)
+  // description ya viene del backend
 }
 
 interface DashboardStats {
@@ -66,25 +68,30 @@ const mapStatusToLabel = (status: string): string => {
   return status || 'Desconocido';
 };
 
-function KPICard({ 
-  title, 
-  value, 
-  color, 
-  progress 
-}: { 
-  title: string; 
-  value: string | number; 
-  color: string; 
+function KPICard({
+  title,
+  value,
+  color,
+  progress
+}: {
+  title: string;
+  value: string | number;
+  color: string;
   progress: number;
 }) {
+  const isAvgTime = title === 'Tiempo Promedio Respuesta';
   return (
     <div className="bg-white border border-[#E6EAF0] rounded-lg p-5 shadow-[0_2px_8px_rgba(16,24,40,0.06)] flex-1">
       <div className="text-[12px] text-[#6D7783] mb-2">{title}</div>
-      <div className={`text-[36px] font-semibold mb-3 ${
-        color === 'green' ? 'text-[#48946F]' : 
-        color === 'red' ? 'text-[#DA4F44]' : 
-        'text-[#2F3A46]'
-      }`}>
+      <div
+        className={`${isAvgTime ? 'text-[30px]' : 'text-[36px]'} font-semibold mb-3 ${
+          color === 'green'
+            ? 'text-[#48946F]'
+            : color === 'red'
+            ? 'text-[#DA4F44]'
+            : 'text-[#2F3A46]'
+        }`}
+      >
         {value}
       </div>
       <div className="w-full h-1.5 bg-[#E6EAF0] rounded-full overflow-hidden">
@@ -143,7 +150,8 @@ function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
     script.onload = () => {
       const L = window.L;
-      const map = L.map(mapRef.current).setView([-33.449, -70.668], 15);
+      // Centro de ejemplo: comuna de Vitacura
+      const map = L.map(mapRef.current).setView([-33.383, -70.58], 14);
       mapInstance.current = map;
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -237,6 +245,7 @@ export default function Dashboard() {
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [areaFilterOpen, setAreaFilterOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -334,8 +343,8 @@ export default function Dashboard() {
       <div className="flex gap-4 mb-6 flex-wrap">
         <KPICard title="Total de Tickets" value={stats?.total_tickets || 0} color="gray" progress={100} />
         <div className="bg-white border border-[#E6EAF0] rounded-lg p-5 shadow-[0_2px_8px_rgba(16,24,40,0.06)] flex-1 min-w-[220px]">
-          <div className="text-[12px] text-[#6D7783] mb-2">Distribución por estado (%)</div>
-          <div className="space-y-1.5 text-[11.5px] text-[#4B5563]">
+          <div className="text-[13px] text-[#4B5563] font-medium mb-2">Distribución por estado (%)</div>
+          <div className="space-y-1.5 text-[12px] text-[#4B5563]">
             {stats && Object.entries(stats.tickets_by_status).map(([status, count]) => {
               const pct = stats.total_tickets ? Math.round((count / stats.total_tickets) * 100) : 0;
               return (
@@ -463,7 +472,11 @@ export default function Dashboard() {
                     const statusColor = mapStatusToColor(caso.status);
 
                     return (
-                      <tr key={caso.id} className="border-b border-[#EEF1F4] hover:bg-[#F9FAFB] transition-colors">
+                      <tr
+                        key={caso.id}
+                        className="border-b border-[#EEF1F4] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+                        onClick={() => setSelectedTicket(caso)}
+                      >
                         <td className="px-4 py-4">
                           <span className="text-[14px] font-mono text-[#306CBB]">#{caso.id}</span>
                         </td>
@@ -532,6 +545,56 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      {/* Detalle rápido del ticket seleccionado */}
+      {selectedTicket && (
+        <div className="mt-6 bg-white border border-[#E6EAF0] rounded-lg shadow-[0_2px_8px_rgba(16,24,40,0.06)] p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11.5px] text-[#6B7280] font-mono">#{selectedTicket.id}</span>
+                <span className={`inline-block px-3 py-1 rounded-full text-[12px] font-medium text-white ${mapStatusToColor(selectedTicket.status)}`}>
+                  {selectedTicket.status}
+                </span>
+                {selectedTicket.urgency_level && (
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11.5px] font-medium text-white ${mapUrgencyToColor(selectedTicket.urgency_level)}`}>
+                    {selectedTicket.urgency_level}
+                  </span>
+                )}
+                {selectedTicket.area_name && (
+                  <span className="px-2 py-0.5 rounded-md text-[11.5px] bg-[#F3F4F6] text-[#4B5563] border border-[#E5E7EB]">
+                    {selectedTicket.area_name}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-[14px] font-semibold text-[#111827] mb-1">
+                {selectedTicket.title}
+              </h2>
+              <p className="text-[12.5px] text-[#4B5563] whitespace-pre-line">
+                {selectedTicket.description}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedTicket(null)}
+              className="text-[12px] text-[#6B7280] hover:text-[#111827]"
+            >
+              Cerrar
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-4 text-[12px] text-[#4B5563]">
+            <div>
+              <div className="text-[#6B7280] text-[11px]">Creado</div>
+              <div>{new Date(selectedTicket.created_at).toLocaleString('es-CL')}</div>
+            </div>
+            {selectedTicket.assigned_to && (
+              <div>
+                <div className="text-[#6B7280] text-[11px]">Equipo asignado</div>
+                <div>{selectedTicket.assigned_to}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
