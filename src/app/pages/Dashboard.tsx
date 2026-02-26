@@ -334,6 +334,8 @@ export default function Dashboard() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [selectedUrgencies, setSelectedUrgencies] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<'all' | 'today' | '7d' | '30d'>('all');
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [areaFilterOpen, setAreaFilterOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -415,6 +417,23 @@ export default function Dashboard() {
     let filtered = tickets.filter(c => {
       if (selectedStatuses.length && !selectedStatuses.includes(c.status)) return false;
       if (selectedAreas.length && !selectedAreas.includes(c.area_name)) return false;
+      if (selectedUrgencies.length && !selectedUrgencies.includes(c.urgency_level)) return false;
+
+      if (dateRange !== 'all') {
+        const created = new Date(c.created_at).getTime();
+        const now = Date.now();
+        const oneDay = 24 * 60 * 60 * 1000;
+        if (dateRange === 'today') {
+          const today = new Date();
+          const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+          const end = start + oneDay;
+          if (created < start || created >= end) return false;
+        } else if (dateRange === '7d') {
+          if (created < now - 7 * oneDay) return false;
+        } else if (dateRange === '30d') {
+          if (created < now - 30 * oneDay) return false;
+        }
+      }
       return true;
     });
 
@@ -488,9 +507,9 @@ export default function Dashboard() {
       <div className="flex gap-6 flex-col lg:flex-row">
         {/* Left Column - Table */}
         <div className="flex-1">
-          {/* Controls Strip: paginación */}
+          {/* Controls Strip: filtros de urgencia/fecha + paginación */}
           <div className="bg-white border border-[#E6EAF0] rounded-lg p-3 mb-4 flex items-center justify-between flex-wrap gap-3 text-[12.5px] text-[#4B5563]">
-            <div>
+            <div className="flex items-center gap-3 flex-wrap">
               {tickets.length > 0 && (
                 <span>
                   Mostrando{' '}
@@ -501,6 +520,47 @@ export default function Dashboard() {
                   de <strong>{tickets.length}</strong> tickets
                 </span>
               )}
+              <div className="flex items-center gap-2">
+                <span className="text-[#6B7280]">Urgencia:</span>
+                <div className="flex gap-1">
+                  {['Alta', 'Media', 'Baja'].map(level => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() =>
+                        setSelectedUrgencies(prev =>
+                          prev.includes(level)
+                            ? prev.filter(u => u !== level)
+                            : [...prev, level]
+                        )
+                      }
+                      className={`px-2 py-1 rounded-full border text-[11px] ${
+                        selectedUrgencies.includes(level)
+                          ? 'bg-[#F97316]/10 border-[#F97316] text-[#C2410C]'
+                          : 'bg-white border-[#E5E7EB] text-[#4B5563]'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[#6B7280]">Fecha:</span>
+                <select
+                  value={dateRange}
+                  onChange={e => {
+                    setDateRange(e.target.value as any);
+                    setPage(1);
+                  }}
+                  className="px-2 py-1 border border-[#E5E7EB] rounded-md text-[12px] bg-white cursor-pointer"
+                >
+                  <option value="all">Todas</option>
+                  <option value="today">Hoy</option>
+                  <option value="7d">Últimos 7 días</option>
+                  <option value="30d">Últimos 30 días</option>
+                </select>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
