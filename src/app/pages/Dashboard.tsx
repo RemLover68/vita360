@@ -32,6 +32,11 @@ interface Ticket {
   _priority_label?: string;
   // Solo para detalle rápido en dashboard (texto completo)
   // description ya viene del backend
+  evidences?: {
+    image_url: string;
+    description?: string;
+    created_at: string;
+  }[];
 }
 
 interface DashboardStats {
@@ -123,12 +128,26 @@ function mapUrgencyToColor(urgency: string): string {
 }
 
 // Componente Mapa Integrado
-function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
+function MapComponentInline({
+  tickets,
+  selectedStatuses,
+  setSelectedStatuses,
+  selectedAreas,
+  setSelectedAreas,
+}: {
+  tickets: Ticket[];
+  selectedStatuses: string[];
+  setSelectedStatuses: (fn: (prev: string[]) => string[]) => void;
+  selectedAreas: string[];
+  setSelectedAreas: (fn: (prev: string[]) => string[]) => void;
+}) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const [currentTime, setCurrentTime] = useState<string>(
     new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
   );
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [areaOpen, setAreaOpen] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -215,7 +234,7 @@ function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
 
   return (
     <div className="bg-white border border-[#E6EAF0] rounded-lg shadow-[0_2px_8px_rgba(16,24,40,0.06)] p-4 mb-6">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#306CBB]/10 text-[#306CBB]">
             <MapPin size={16} />
@@ -224,8 +243,79 @@ function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
             VITwin
           </div>
         </div>
-        <div className="text-[11px] text-[#6D7783] px-2 py-1 rounded-full bg-[#F3F5F7] border border-[#E6EAF0]">
-          ⏱ {currentTime} hrs
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtros rápidos en el header del mapa */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setStatusOpen(o => !o)}
+              className="px-3 py-1.5 rounded-full border border-[#E5E7EB] bg-white text-[12px] text-[#4B5563] inline-flex items-center gap-1"
+            >
+              Estado
+              <ChevronDown size={12} className={`transition-transform ${statusOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {statusOpen && (
+              <div className="absolute right-0 mt-1 w-44 bg-white border border-[#E5E7EB] rounded-md shadow-lg z-30 p-2 space-y-1 text-[12px]">
+                {['Recibido', 'Asignado', 'En Gestión', 'Resuelto', 'Cerrado'].map(status => (
+                  <label key={status} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedStatuses.includes(status)}
+                      onChange={() => {
+                        setSelectedStatuses(prev =>
+                          prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+                        );
+                      }}
+                    />
+                    <span>{status}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAreaOpen(o => !o)}
+              className="px-3 py-1.5 rounded-full border border-[#E5E7EB] bg-white text-[12px] text-[#4B5563] inline-flex items-center gap-1"
+            >
+              Área
+              <ChevronDown size={12} className={`transition-transform ${areaOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {areaOpen && (
+              <div className="absolute right-0 mt-1 w-48 bg-white border border-[#E5E7EB] rounded-md shadow-lg z-30 p-2 space-y-1 text-[12px] max-h-60 overflow-y-auto">
+                {Array.from(new Set(tickets.map(t => t.area_name))).map(area => (
+                  <label key={area} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedAreas.includes(area)}
+                      onChange={() => {
+                        setSelectedAreas(prev =>
+                          prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+                        );
+                      }}
+                    />
+                    <span>{area}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded-full border border-[#E5E7EB] bg-white text-[12px] text-[#4B5563]"
+          >
+            Cámaras
+          </button>
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded-full border border-[#E5E7EB] bg-white text-[12px] text-[#4B5563]"
+          >
+            Vehículos
+          </button>
+          <div className="text-[11px] text-[#6D7783] px-2 py-1 rounded-full bg-[#F3F5F7] border border-[#E6EAF0]">
+            ⏱ {currentTime} hrs
+          </div>
         </div>
       </div>
       <div
@@ -236,9 +326,12 @@ function MapComponentInline({ tickets }: { tickets: Ticket[] }) {
   );
 }
 
+type SortColumn = 'priority' | 'date' | 'status' | 'area' | 'id' | 'title';
+
 export default function Dashboard() {
   const { token } = useAuth();
-  const [sortBy, setSortBy] = useState<'urgency' | 'date'>('urgency');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('priority');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
@@ -247,6 +340,8 @@ export default function Dashboard() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
   useEffect(() => {
     if (token) fetchData();
@@ -295,6 +390,7 @@ export default function Dashboard() {
         });
 
         setTickets(enriched);
+        setPage(1);
         
         // Calcular stats
         const stats: DashboardStats = {
@@ -322,15 +418,32 @@ export default function Dashboard() {
       return true;
     });
 
-    return filtered.sort((a, b) => {
-      if (sortBy === 'urgency') {
-        const aScore = a._urgency_score ?? 0;
-        const bScore = b._urgency_score ?? 0;
-        return bScore - aScore;
+    const sorted = filtered.sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      switch (sortColumn) {
+        case 'priority': {
+          const aScore = a._urgency_score ?? 0;
+          const bScore = b._urgency_score ?? 0;
+          return (aScore - bScore) * -dir; // mayor score = más prioritario
+        }
+        case 'date':
+          return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * -dir;
+        case 'status':
+          return a.status.localeCompare(b.status) * dir;
+        case 'area':
+          return (a.area_name || '').localeCompare(b.area_name || '') * dir;
+        case 'id':
+          return (a.id - b.id) * dir;
+        case 'title':
+          return a.title.localeCompare(b.title) * dir;
+        default:
+          return 0;
       }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    }).slice(0, 5); // Mostrar solo los 5 primeros
-  }, [sortBy, selectedStatuses, selectedAreas, tickets]);
+    });
+
+    const start = (page - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sortColumn, sortDirection, selectedStatuses, selectedAreas, tickets, page, pageSize]);
 
   if (loading) {
     return <div className="text-center py-12 text-muted-foreground">Cargando dashboard...</div>;
@@ -348,7 +461,7 @@ export default function Dashboard() {
               const pct = stats.total_tickets ? Math.round((count / stats.total_tickets) * 100) : 0;
               return (
                 <div key={status} className="flex items-center gap-2">
-                  <span className="w-20">{status}</span>
+                  <span className="w-24">{status} {count}</span>
                   <div className="flex-1 h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
                     <div className="h-full rounded-full bg-[#306CBB]" style={{ width: `${pct}%` }} />
                   </div>
@@ -363,85 +476,54 @@ export default function Dashboard() {
       </div>
 
       {/* Mapa Urbano siempre visible */}
-      <MapComponentInline tickets={tickets} />
+      <MapComponentInline
+        tickets={tickets}
+        selectedStatuses={selectedStatuses}
+        setSelectedStatuses={setSelectedStatuses}
+        selectedAreas={selectedAreas}
+        setSelectedAreas={setSelectedAreas}
+      />
 
       {/* Main Content - Two Columns */}
       <div className="flex gap-6 flex-col lg:flex-row">
         {/* Left Column - Table */}
         <div className="flex-1">
-          {/* Controls Strip */}
-          <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 mb-4 flex items-center gap-4 flex-wrap relative">
-            {/* Filtro múltiple por estado */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setStatusFilterOpen(o => !o)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#E6EAF0] rounded-lg text-[13px] bg-white hover:border-[#306CBB]"
-              >
-                Estado
-                <ChevronDown size={14} className={`transition-transform ${statusFilterOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {statusFilterOpen && (
-                <div className="absolute mt-1 w-44 bg-white border border-[#E5E7EB] rounded-md shadow-lg z-20 p-2 space-y-1 text-[12.5px]">
-                  {['Recibido', 'Asignado', 'En Gestión', 'Resuelto', 'Cerrado'].map(status => (
-                    <label key={status} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedStatuses.includes(status)}
-                        onChange={() => {
-                          setSelectedStatuses(prev =>
-                            prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
-                          );
-                        }}
-                      />
-                      <span>{status}</span>
-                    </label>
-                  ))}
-                </div>
+          {/* Controls Strip: paginación */}
+          <div className="bg-white border border-[#E6EAF0] rounded-lg p-3 mb-4 flex items-center justify-between flex-wrap gap-3 text-[12.5px] text-[#4B5563]">
+            <div>
+              {tickets.length > 0 && (
+                <span>
+                  Mostrando{' '}
+                  <strong>
+                    {(page - 1) * pageSize + 1}–
+                    {Math.min(page * pageSize, tickets.length)}
+                  </strong>{' '}
+                  de <strong>{tickets.length}</strong> tickets
+                </span>
               )}
             </div>
-
-            {/* Filtro múltiple por área */}
-            <div className="relative">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setAreaFilterOpen(o => !o)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#E6EAF0] rounded-lg text-[13px] bg-white hover:border-[#306CBB]"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-2 py-1 border border-[#E5E7EB] rounded-md disabled:opacity-50"
               >
-                Área
-                <ChevronDown size={14} className={`transition-transform ${areaFilterOpen ? 'rotate-180' : ''}`} />
+                ◀
               </button>
-              {areaFilterOpen && (
-                <div className="absolute mt-1 w-48 bg-white border border-[#E5E7EB] rounded-md shadow-lg z-20 p-2 space-y-1 text-[12.5px] max-h-60 overflow-y-auto">
-                  {Array.from(new Set(tickets.map(t => t.area_name))).map(area => (
-                    <label key={area} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedAreas.includes(area)}
-                        onChange={() => {
-                          setSelectedAreas(prev =>
-                            prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
-                          );
-                        }}
-                      />
-                      <span>{area}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="w-px h-6 bg-[#E6EAF0]" />
-            <div className="flex items-center gap-2 text-[14px]">
-              <span className="text-[#6D7783]">Ordenar por:</span>
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-                className="px-3 py-2 border border-[#E6EAF0] rounded-lg text-[14px] bg-white cursor-pointer outline-none hover:border-[#306CBB]"
+              <span>
+                Página {page} de {Math.max(1, Math.ceil(tickets.length / pageSize))}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPage(p => Math.min(Math.ceil(tickets.length / pageSize) || 1, p + 1))
+                }
+                disabled={page >= Math.ceil(tickets.length / pageSize)}
+                className="px-2 py-1 border border-[#E5E7EB] rounded-md disabled:opacity-50"
               >
-                <option value="urgency">Prioridad</option>
-                <option value="date">Más recientes</option>
-              </select>
+                ▶
+              </button>
             </div>
           </div>
 
@@ -450,12 +532,49 @@ export default function Dashboard() {
             <table className="w-full">
               <thead>
                 <tr className="bg-[#F1F3F5] border-b border-[#EEF1F4]">
-                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">ID</th>
-                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Título</th>
-                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Urgencia</th>
-                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Prioridad</th>
-                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Área</th>
-                  <th className="text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4">Estado</th>
+                  {(['id','title','urgency','priority','area','status','date'] as const).map(col => {
+                    const labelMap: Record<string,string> = {
+                      id: 'ID',
+                      title: 'Título',
+                      urgency: 'Urgencia',
+                      priority: 'Prioridad',
+                      area: 'Área',
+                      status: 'Estado',
+                      date: 'Fecha',
+                    };
+                    const sortKeyMap: Partial<Record<string, SortColumn>> = {
+                      id: 'id',
+                      title: 'title',
+                      priority: 'priority',
+                      area: 'area',
+                      status: 'status',
+                      date: 'date',
+                    };
+                    const sortKey = sortKeyMap[col];
+                    const isSorted = sortKey && sortColumn === sortKey;
+                    const arrow = isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : '';
+                    const handleClick = () => {
+                      if (!sortKey) return;
+                      if (sortColumn === sortKey) {
+                        setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
+                      } else {
+                        setSortColumn(sortKey);
+                        setSortDirection('desc');
+                      }
+                    };
+                    return (
+                      <th
+                        key={col}
+                        onClick={handleClick}
+                        className={`text-left text-[13px] font-semibold text-[#6D7783] px-4 py-4 ${sortKey ? 'cursor-pointer select-none' : ''}`}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {labelMap[col]}
+                          {arrow && <span className="text-[10px]">{arrow}</span>}
+                        </span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -503,6 +622,9 @@ export default function Dashboard() {
                             {mapStatusToLabel(caso.status)}
                           </span>
                         </td>
+                        <td className="px-4 py-4 text-[12px] text-[#4B5563]">
+                          {new Date(caso.created_at).toLocaleDateString('es-CL')}
+                        </td>
                       </tr>
                     );
                   })
@@ -512,35 +634,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right Column - Resumen */}
+        {/* Right Column - placeholder simple */}
         <div className="w-full lg:w-[380px]">
-          <div className="bg-white border border-[#E6EAF0] rounded-lg shadow-[0_2px_8px_rgba(16,24,40,0.06)] p-6 sticky top-6">
-            <div className="flex items-center gap-2.5 mb-6">
+          <div className="bg-white border border-[#E6EAF0] rounded-lg shadow-[0_2px_8px_rgba(16,24,40,0.06)] p-6 sticky top-6 flex flex-col gap-3 text-[12.5px] text-[#4B5563]">
+            <div className="flex items-center gap-2.5 mb-1">
               <div className="w-8 h-8 rounded-lg bg-[#306CBB] flex items-center justify-center flex-shrink-0">
-                <Zap className="w-4 h-4 text-white" size={16} />
+                <Zap className="w-4 h-4 text-white" />
               </div>
-              <h2 className="text-[18px] font-semibold text-[#2F3A46]">Resumen</h2>
+              <h2 className="text-[15px] font-semibold text-[#2F3A46]">Panel inteligente</h2>
             </div>
-
-            <div className="space-y-5">
-              <div>
-                <label className="block text-[13px] font-semibold text-[#2F3A46] mb-2">
-                  Tickets por Estado
-                </label>
-                <div className="space-y-2">
-                  {stats && Object.entries(stats.tickets_by_status).map(([status, count]) => (
-                    <div key={status} className="flex justify-between items-center text-[13px] px-3 py-2 bg-[#F3F5F7] rounded-md">
-                      <span className="text-[#2F3A46]">{status}</span>
-                      <span className="font-semibold text-[#306CBB]">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="h-px bg-[#EEF1F4]" />
-
-              {/* Sección de tasa de resolución retirada para evitar redundancia */}
-            </div>
+            <p className="text-[12px] text-[#6B7280]">
+              Vista rápida de la carga actual, priorización y riesgos según urgencia y estado.
+            </p>
           </div>
         </div>
       </div>
@@ -568,9 +673,28 @@ export default function Dashboard() {
               <h2 className="text-[14px] font-semibold text-[#111827] mb-1">
                 {selectedTicket.title}
               </h2>
-              <p className="text-[12.5px] text-[#4B5563] whitespace-pre-line">
+              <p className="text-[12.5px] text-[#4B5563] whitespace-pre-line mb-3">
                 {selectedTicket.description}
               </p>
+              {/* Fotos si existen */}
+              {selectedTicket.evidences && selectedTicket.evidences.length > 0 && (
+                <div className="mt-2 grid grid-cols-2 gap-3 max-w-[420px]">
+                  {selectedTicket.evidences.map((ev, idx) => (
+                    <div key={idx} className="border border-[#E5E7EB] rounded-md overflow-hidden bg-[#F9FAFB]">
+                      <img
+                        src={ev.image_url}
+                        alt={`Evidencia ${idx + 1}`}
+                        className="w-full h-28 object-cover"
+                      />
+                      {ev.description && (
+                        <div className="px-2 py-1.5 text-[11px] text-[#4B5563]">
+                          {ev.description}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -580,7 +704,7 @@ export default function Dashboard() {
               Cerrar
             </button>
           </div>
-          <div className="flex flex-wrap gap-4 text-[12px] text-[#4B5563]">
+          <div className="flex flex-wrap gap-4 text-[12px] text-[#4B5563] mb-4">
             <div>
               <div className="text-[#6B7280] text-[11px]">Creado</div>
               <div>{new Date(selectedTicket.created_at).toLocaleString('es-CL')}</div>
@@ -591,6 +715,36 @@ export default function Dashboard() {
                 <div>{selectedTicket.assigned_to}</div>
               </div>
             )}
+          </div>
+          {/* Línea de tiempo simple */}
+          <div className="mt-2">
+            <div className="text-[11px] text-[#6B7280] uppercase tracking-wide mb-2">Línea de tiempo</div>
+            <div className="space-y-1.5">
+              {['Recibido', 'Asignado', 'En Gestión', 'Resuelto', 'Cerrado'].map((step, idx) => {
+                const statusOrder: Record<string, number> = {
+                  'Recibido': 0,
+                  'Asignado': 1,
+                  'En Gestión': 2,
+                  'Resuelto': 3,
+                  'Cerrado': 4,
+                };
+                const currentIdx = statusOrder[selectedTicket.status] ?? 0;
+                const done = idx <= currentIdx;
+                const baseDate = new Date(selectedTicket.created_at);
+                const stepDate = new Date(baseDate.getTime() + idx * 2 * 60 * 60 * 1000);
+                return (
+                  <div key={step} className="flex items-center gap-2 text-[11.5px]">
+                    <div className={`w-2.5 h-2.5 rounded-full ${done ? 'bg-[#10B981]' : 'bg-[#E5E7EB]'}`} />
+                    <span className={`${done ? 'text-[#111827]' : 'text-[#9CA3AF]'}`}>
+                      {step}
+                    </span>
+                    <span className="text-[#9CA3AF] ml-auto">
+                      {done ? stepDate.toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
