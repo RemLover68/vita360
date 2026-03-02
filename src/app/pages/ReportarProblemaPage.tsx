@@ -142,7 +142,7 @@ export default function ReportarProblemaPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-6 py-6 space-y-6">
         {/* Localización */}
-        <div className="bg-white border border-[#E6EAF0] rounded-lg p-4">
+        <div className="glass-card p-4">
           <button
             type="button"
             onClick={getLocation}
@@ -153,7 +153,7 @@ export default function ReportarProblemaPage() {
         </div>
 
         {/* Título */}
-        <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 space-y-2">
+        <div className="glass-card p-4 space-y-2">
           <label className="block text-[13px] font-semibold text-[#2F3A46]">
             ¿Cuál es el problema? *
           </label>
@@ -168,7 +168,7 @@ export default function ReportarProblemaPage() {
         </div>
 
         {/* Descripción */}
-        <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 space-y-2">
+        <div className="glass-card p-4 space-y-2">
           <label className="block text-[13px] font-semibold text-[#2F3A46]">
             Detalles del problema *
           </label>
@@ -183,7 +183,7 @@ export default function ReportarProblemaPage() {
         </div>
 
         {/* Área */}
-        <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 space-y-2">
+        <div className="glass-card p-4 space-y-2">
           <label className="block text-[13px] font-semibold text-[#2F3A46]">
             Área o categoría *
           </label>
@@ -204,7 +204,7 @@ export default function ReportarProblemaPage() {
         </div>
 
         {/* Urgencia */}
-        <div className="bg-white border border-[#E6EAF0] rounded-lg p-4 space-y-2">
+        <div className="glass-card p-4 space-y-2">
           <label className="block text-[13px] font-semibold text-[#2F3A46]">
             ¿Qué tan urgente es? *
           </label>
