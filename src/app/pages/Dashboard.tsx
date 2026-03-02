@@ -2,6 +2,8 @@ import { MapPin, FileQuestion, ChevronDown, X, Calendar, ChevronLeft, ChevronRig
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth, API_URL } from '../../context/AuthContext';
 import { useFleetStream, type FleetVehicle } from '../../hooks/useFleetStream';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -13,11 +15,14 @@ interface Ticket {
   description: string;
   status: string;
   urgency_level: string;
+  priority_score: number;
   area_name: string;
+  squad_name: string | null;
   assigned_to: string | null;
   created_at: string;
+  lat?: number | null;
+  lon?: number | null;
   _urgency_score?: number;
-  _priority_label?: string;
   evidences?: { image_url: string; description?: string; created_at: string }[];
 }
 
@@ -357,17 +362,17 @@ function MiniCalendar({ id, openId, setOpenId, dateRange, setDateRange }: {
 // Leaflet icon helpers — inline styles requeridos para div icons
 // ─────────────────────────────────────────────────────────────────────────────
 
-function makePatrolIcon(L: any) {
+function makePatrolIcon() {
   return L.divIcon({
     html: `<div style="width:26px;height:26px;border-radius:50%;background:#FBBF24;border:2.5px solid #1E40AF;display:flex;align-items:center;justify-content:center;color:#1E40AF;font-weight:700;font-size:12px;font-family:sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.35)">P</div>`,
-    className: '', iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -16],
+    className: '', iconSize: [26, 26] as [number, number], iconAnchor: [13, 13] as [number, number], popupAnchor: [0, -16] as [number, number],
   });
 }
 
-function makeSuspectIcon(L: any) {
+function makeSuspectIcon() {
   return L.divIcon({
     html: `<div style="width:26px;height:26px;border-radius:50%;background:#EF4444;border:2.5px solid #991B1B;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;font-family:sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.35)">S</div>`,
-    className: '', iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -16],
+    className: '', iconSize: [26, 26] as [number, number], iconAnchor: [13, 13] as [number, number], popupAnchor: [0, -16] as [number, number],
   });
 }
 
@@ -415,8 +420,8 @@ function MapComponentInline({
   // Fleet markers
   useEffect(() => {
     if (!leafletReady.current) return;
-    const L = window.L; const map = mapInstance.current;
-    if (!L || !map) return;
+    const map = mapInstance.current;
+    if (!map) return;
     if (!showVehicles) {
       for (const m of fleetMarkers.current.values()) map.removeLayer(m);
       fleetMarkers.current.clear();
@@ -432,7 +437,7 @@ function MapComponentInline({
         fleetMarkers.current.get(v.id).setLatLng([v.lat, v.lng]);
         fleetMarkers.current.get(v.id).getPopup()?.setContent(popup);
       } else {
-        const icon = v.type === 'suspect' ? makeSuspectIcon(L) : makePatrolIcon(L);
+        const icon = v.type === 'suspect' ? makeSuspectIcon() : makePatrolIcon();
         fleetMarkers.current.set(v.id, L.marker([v.lat, v.lng], { icon }).bindPopup(popup).addTo(map));
       }
       if (v.type === 'suspect') {
@@ -450,33 +455,51 @@ function MapComponentInline({
     }
   }, [fleetVehicles, showVehicles]);
 
-  // Init Leaflet
+  // Init Leaflet (usa el paquete npm, sin inyección de CDN)
   useEffect(() => {
     if (mapInstance.current || !mapRef.current) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
-    document.head.appendChild(link);
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-    script.onload = () => {
-      const L = window.L;
-      const map = L.map(mapRef.current).setView([-33.383, -70.58], 14);
-      mapInstance.current = map; leafletReady.current = true;
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
-      const urgencyColors: Record<string, string> = { Alta: '#EF4444', Media: '#F59E0B', Baja: '#16A34A' };
-      const coords: [number, number][] = [[-33.449,-70.668],[-33.425,-70.680],[-33.436,-70.650],[-33.455,-70.670],[-33.418,-70.685]];
-      tickets.slice(0, 10).forEach((t, i) => {
-        const color = urgencyColors[t.urgency_level] || '#1C3A8A';
-        const icon = L.divIcon({ html: `<div style="width:24px;height:24px;background:${color};border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.2)"></div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
-        L.marker(coords[i % coords.length], { icon }).bindPopup(`<div style="font-family:system-ui;font-size:13px;width:200px"><div style="font-weight:600;margin-bottom:4px">${t.title}</div><div style="color:#6B7280;font-size:12px">${t.area_name||'Sin área'}</div></div>`, { maxWidth: 240 }).addTo(map);
+
+    const map = L.map(mapRef.current).setView([-33.383, -70.58], 13);
+    mapInstance.current = map;
+    leafletReady.current = true;
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 20,
+    }).addTo(map);
+
+    // Marcadores de tickets usando lat/lon del backend
+    const urgencyColors: Record<string, string> = { Alta: '#EF4444', Media: '#F59E0B', Baja: '#16A34A' };
+    tickets.forEach((t) => {
+      if (!t.lat || !t.lon) return;
+      const color = urgencyColors[t.urgency_level] || '#1C3A8A';
+      const icon = L.divIcon({
+        html: `<div style="width:22px;height:22px;background:${color};border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.2)"></div>`,
+        className: '',
+        iconSize: [22, 22] as [number, number],
+        iconAnchor: [11, 11] as [number, number],
       });
-    };
-    document.head.appendChild(script);
+      L.marker([t.lat, t.lon], { icon })
+        .bindPopup(
+          `<div style="font-family:system-ui;font-size:13px;width:210px">
+            <div style="font-weight:600;margin-bottom:4px">${t.title}</div>
+            <div style="color:#6B7280;font-size:12px">${t.area_name || 'Sin área'}</div>
+            <div style="color:#6B7280;font-size:11px;margin-top:2px">Urgencia: ${t.urgency_level || '—'}</div>
+          </div>`,
+          { maxWidth: 240 }
+        )
+        .addTo(map);
+    });
+
     return () => {
       if (mapInstance.current) {
-        mapInstance.current.remove(); mapInstance.current = null; leafletReady.current = false;
-        fleetMarkers.current.clear(); suspectTrail.current = []; suspectPolyline.current = null;
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        leafletReady.current = false;
+        fleetMarkers.current.clear();
+        suspectTrail.current = [];
+        suspectPolyline.current = null;
       }
     };
   }, [tickets]);
@@ -650,16 +673,11 @@ export default function Dashboard() {
       const res = await fetch(`${API_URL}/tickets`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
-        const enriched: Ticket[] = data.map((t: Ticket) => {
-          const area_name = t.area_name || 'Atención General';
-          let min = 20, max = 80;
-          if (t.urgency_level === 'Alta') { min = 70; max = 100; }
-          else if (t.urgency_level === 'Media') { min = 40; max = 75; }
-          else if (t.urgency_level === 'Baja') { min = 10; max = 45; }
-          const score = Math.floor(Math.random() * (max - min + 1)) + min;
-          const priorityLabel = score >= 85 ? 'Crítica' : score >= 65 ? 'Alta' : score >= 45 ? 'Media' : 'Normal';
-          return { ...t, area_name, _urgency_score: score, _priority_label: priorityLabel };
-        });
+        const enriched: Ticket[] = data.map((t: Ticket) => ({
+          ...t,
+          area_name: t.area_name || 'Atención General',
+          _urgency_score: t.priority_score ?? 0,
+        }));
         setTickets(enriched); setPage(1);
         setStats({
           total_tickets: enriched.length,
@@ -830,10 +848,9 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex flex-col text-[12px]">
-                          <span className="font-medium text-foreground">{caso._priority_label||'Normal'}</span>
-                          {typeof caso._urgency_score === 'number' && <span className="text-[11px] text-muted-foreground">{caso._urgency_score}%</span>}
-                        </div>
+                        {typeof caso._urgency_score === 'number' && (
+                          <span className="font-mono text-[13px] font-medium text-foreground">{caso._urgency_score}%</span>
+                        )}
                       </td>
                       <td className="px-4 py-4"><span className="text-[13px] text-muted-foreground">{caso.area_name||'—'}</span></td>
                       <td className="px-4 py-4">
